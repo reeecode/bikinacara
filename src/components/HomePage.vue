@@ -1,4 +1,6 @@
 <script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { 
   Sparkles, 
   Layers, 
@@ -14,14 +16,51 @@ import {
   Globe,
   Share2
 } from 'lucide-vue-next'
+import { AUTH_SERVICE } from '../services/turso.js'
+import AuthModal from './AuthModal.vue'
 
-const emit = defineEmits(['start-create', 'open-auth', 'go-dashboard'])
-const props = defineProps({
-  currentUser: {
-    type: Object,
-    default: null
+const router = useRouter()
+const route = useRoute()
+
+const currentUser = ref(null)
+const showAuthModal = ref(false)
+const authModalMode = ref('login')
+
+onMounted(() => {
+  currentUser.value = AUTH_SERVICE.getCurrentUser()
+  if (route.query.auth) {
+    authModalMode.value = route.query.auth === 'register' ? 'register' : 'login'
+    showAuthModal.value = true
   }
 })
+
+const openAuth = (mode = 'login') => {
+  authModalMode.value = mode
+  showAuthModal.value = true
+}
+
+const onAuthSuccess = (user) => {
+  currentUser.value = user
+  showAuthModal.value = false
+  const redirect = route.query.redirect || '/dashboard'
+  router.push(redirect)
+}
+
+const handleStartCreate = async () => {
+  if (!currentUser.value) {
+    openAuth('register')
+    return
+  }
+
+  const existingEvents = await AUTH_SERVICE.getUserEvents(currentUser.value.id)
+  if (existingEvents && existingEvents.length >= 1) {
+    alert('Batas kuota tercapai: Setiap akun hanya dapat membuat maksimal 1 halaman acara (Free Plan). Silakan kelola di Dashboard.')
+    router.push('/dashboard')
+    return
+  }
+
+  router.push('/builder')
+}
 </script>
 
 <template>
@@ -36,13 +75,13 @@ const props = defineProps({
       <div class="flex items-center gap-2 sm:gap-3">
         <template v-if="currentUser">
           <button 
-            @click="emit('go-dashboard')"
+            @click="router.push('/dashboard')"
             class="text-xs font-semibold px-3 sm:px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"
           >
             Dashboard
           </button>
           <button 
-            @click="emit('start-create')"
+            @click="handleStartCreate"
             class="text-xs font-bold px-3 sm:px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center gap-1"
           >
             <Sparkles class="w-3.5 h-3.5" />
@@ -52,13 +91,13 @@ const props = defineProps({
         </template>
         <template v-else>
           <button 
-            @click="emit('open-auth', 'login')"
+            @click="openAuth('login')"
             class="text-xs font-medium text-slate-400 hover:text-white px-2.5 sm:px-3 py-2 cursor-pointer transition"
           >
             Masuk
           </button>
           <button 
-            @click="emit('open-auth', 'register')"
+            @click="openAuth('register')"
             class="text-xs font-bold px-3 sm:px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center gap-1"
           >
             <span>Daftar</span>
@@ -89,14 +128,15 @@ const props = defineProps({
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
         <button 
-          @click="emit('start-create')"
+          @click="handleStartCreate"
           class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-sm tracking-wide transition flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 cursor-pointer"
         >
           <span>Mulai Buat Halaman Acara (Gratis)</span>
           <ArrowRight class="w-4 h-4" />
         </button>
         <button 
-          @click="emit('open-auth', 'register')"
+          v-if="!currentUser"
+          @click="openAuth('register')"
           class="w-full sm:w-auto px-6 py-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-sm transition cursor-pointer"
         >
           Daftar Akun Panitia
@@ -122,7 +162,7 @@ const props = defineProps({
               Total Hadiah: Rp 10.000.000
             </div>
           </div>
-          <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4 text-center cursor-pointer hover:border-emerald-500/40 transition" @click="emit('start-create')">
+          <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-4 text-center cursor-pointer hover:border-emerald-500/40 transition" @click="handleStartCreate">
             <Smartphone class="w-8 h-8 text-emerald-400 mx-auto mb-2" />
             <div class="text-xs font-bold text-white">Buka Live Editor Demo</div>
             <div class="text-[11px] text-slate-400 mt-1">Klik untuk langsung mencoba membuat dan mengedit halaman acara.</div>
@@ -175,5 +215,13 @@ const props = defineProps({
     <footer class="border-t border-slate-900 py-8 text-center text-xs text-slate-500">
       © {{ new Date().getFullYear() }} <span class="text-white font-semibold">Bikin<span class="text-[#34d399]">Acara</span></span> • Bikin Landing Page Acara Keren Tanpa Ribet.
     </footer>
+
+    <!-- Auth Modal jika user klik Masuk/Daftar -->
+    <AuthModal 
+      v-if="showAuthModal" 
+      :initialMode="authModalMode" 
+      @close="showAuthModal = false" 
+      @auth-success="onAuthSuccess" 
+    />
   </div>
 </template>

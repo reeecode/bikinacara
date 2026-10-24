@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
   Layers, 
   Plus, 
@@ -22,14 +23,8 @@ import {
 import QRCode from 'qrcode'
 import { AUTH_SERVICE } from '../services/turso.js'
 
-const props = defineProps({
-  currentUser: {
-    type: Object,
-    required: true
-  }
-})
-
-const emit = defineEmits(['create-new', 'edit-event', 'logout', 'go-home', 'view-event'])
+const router = useRouter()
+const currentUser = ref(null)
 
 const userEvents = ref([])
 const isLoading = ref(true)
@@ -65,10 +60,10 @@ const downloadDashboardQr = () => {
 }
 
 const loadEvents = async () => {
-  if (!props.currentUser?.id) return
+  if (!currentUser.value?.id) return
   isLoading.value = true
   try {
-    userEvents.value = await AUTH_SERVICE.getUserEvents(props.currentUser.id)
+    userEvents.value = await AUTH_SERVICE.getUserEvents(currentUser.value.id)
   } catch (err) {
     console.error('Error loading events:', err)
   } finally {
@@ -77,16 +72,38 @@ const loadEvents = async () => {
 }
 
 onMounted(() => {
+  currentUser.value = AUTH_SERVICE.getCurrentUser()
+  if (!currentUser.value) {
+    router.push('/?auth=login')
+    return
+  }
   loadEvents()
 })
 
-watch(() => props.currentUser, () => {
-  loadEvents()
-}, { deep: true })
+const handleCreateNew = () => {
+  if (userEvents.value.length >= 1) {
+    alert('Batas kuota tercapai: Setiap akun hanya dapat membuat maksimal 1 halaman acara (Free Plan).')
+    return
+  }
+  router.push('/builder')
+}
+
+const handleEditEvent = (ev) => {
+  router.push({ path: '/builder', query: { edit: ev.slug } })
+}
+
+const handleViewEvent = (ev) => {
+  window.open(`/${ev.slug}`, '_blank')
+}
+
+const handleLogout = () => {
+  AUTH_SERVICE.logout()
+  router.push('/')
+}
 
 const handleDelete = async (slug) => {
   if (confirm(`Yakin ingin menghapus halaman "${slug}"?`)) {
-    userEvents.value = await AUTH_SERVICE.deleteUserEvent(props.currentUser.id, slug)
+    userEvents.value = await AUTH_SERVICE.deleteUserEvent(currentUser.value.id, slug)
   }
 }
 
@@ -102,16 +119,16 @@ const copyEventUrl = (slug) => {
   <div class="min-h-screen bg-[#070b12] text-slate-100 pb-16">
     <!-- Navbar Dashboard Full Width -->
     <header class="w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 md:px-10 py-3.5 sm:py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3 cursor-pointer" @click="emit('go-home')">
+      <div class="flex items-center gap-3 cursor-pointer" @click="router.push('/')">
         <img src="/logo-icon.png" alt="BikinAcara Logo" class="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-lg shadow-sm" />
         <span class="font-black text-lg sm:text-xl tracking-tight text-white">Bikin<span class="text-[#34d399]">Acara</span></span>
       </div>
 
       <div class="flex items-center gap-2 sm:gap-3 text-xs">
-        <span class="text-slate-400 hidden sm:inline">Halo, <b class="text-white">{{ currentUser.name }}</b></span>
+        <span class="text-slate-400 hidden sm:inline" v-if="currentUser">Halo, <b class="text-white">{{ currentUser.name }}</b></span>
         <button 
           v-if="userEvents.length === 0"
-          @click="emit('create-new')"
+          @click="handleCreateNew"
           class="font-bold px-3 sm:px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center gap-1 sm:gap-1.5"
         >
           <Plus class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -122,7 +139,7 @@ const copyEventUrl = (slug) => {
           Kuota: 1/1 Acara (Free)
         </div>
         <button 
-          @click="emit('logout')"
+          @click="handleLogout"
           class="text-slate-400 hover:text-rose-400 p-2 rounded-lg hover:bg-slate-800 transition cursor-pointer"
           title="Keluar"
         >
@@ -160,7 +177,7 @@ const copyEventUrl = (slug) => {
           Kamu belum membuat halaman acara apa pun. Yuk, bikin landing page acara pertama kamu sekarang dalam 2 menit!
         </p>
         <button 
-          @click="emit('create-new')"
+          @click="handleCreateNew"
           class="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition inline-flex items-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer"
         >
           <Plus class="w-4 h-4" />
@@ -220,7 +237,7 @@ const copyEventUrl = (slug) => {
                   <QrCode class="w-3.5 h-3.5 text-emerald-400" />
                 </button>
                 <button 
-                  @click="emit('view-event', ev)"
+                  @click="handleViewEvent(ev)"
                   class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
                   title="Buka Halaman Live"
                 >
@@ -230,7 +247,7 @@ const copyEventUrl = (slug) => {
 
               <div class="flex items-center gap-2">
                 <button 
-                  @click="emit('edit-event', ev)"
+                  @click="handleEditEvent(ev)"
                   class="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold transition cursor-pointer flex items-center gap-1.5"
                 >
                   <Edit3 class="w-3.5 h-3.5" />
