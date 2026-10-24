@@ -265,9 +265,6 @@ export const AUTH_SERVICE = {
     const user = users.find(u => u.email === cleanEmail && u.passwordHash === passwordHash)
 
     if (!user) {
-      if (email && password.length >= 6) {
-        return this.register('Panitia Acara', email, password)
-      }
       throw new Error('Email atau password salah!')
     }
 
