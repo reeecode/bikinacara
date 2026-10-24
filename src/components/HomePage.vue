@@ -84,7 +84,7 @@ const props = defineProps({
 
       <p class="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
         Solusi instan untuk BEM, komunitas, dan panitia lomba. Desain brosur online, countdown hadiah, dan formulir pendaftaran dengan link domain kamu sendiri: <br />
-        <code class="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono text-sm">bikinacara.reee.my.id/?page=acara-kamu</code>
+        <code class="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-mono text-sm">bikinacara.reee.my.id/acara-kamu</code>
       </p>
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -109,7 +109,7 @@ const props = defineProps({
           <div class="w-2.5 h-2.5 rounded-full bg-rose-500/60"></div>
           <div class="w-2.5 h-2.5 rounded-full bg-amber-500/60"></div>
           <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/60"></div>
-          <span class="ml-2 text-slate-400">https://bikinacara.reee.my.id/?page=lomba-video-kreatif-2026</span>
+          <span class="ml-2 text-slate-400">https://bikinacara.reee.my.id/lomba-video-kreatif-2026</span>
         </div>
         <div class="p-6 md:p-8 bg-[#090d16] rounded-xl text-left grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           <div>
@@ -155,7 +155,7 @@ const props = defineProps({
           </div>
           <h3 class="font-bold text-white text-base mb-2">Link Subdomain Cantik</h3>
           <p class="text-slate-400 text-xs leading-relaxed">
-            Dapatkan link acara yang profesional (misal: <code>bikinacara.reee.my.id/?page=seminar-2026</code>) untuk dipasang di bio Instagram dan grup broadcast.
+            Dapatkan link acara yang profesional (misal: <code>bikinacara.reee.my.id/seminar-2026</code>) untuk dipasang di bio Instagram dan grup broadcast.
           </p>
         </div>
 

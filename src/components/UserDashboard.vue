@@ -58,7 +58,7 @@ const handleDelete = async (slug) => {
 }
 
 const copyEventUrl = (slug) => {
-  const url = `https://bikinacara.reee.my.id/?page=${slug}`
+  const url = `https://bikinacara.reee.my.id/${slug}`
   navigator.clipboard.writeText(url)
   copiedSlug.value = slug
   setTimeout(() => copiedSlug.value = '', 2000)
@@ -164,7 +164,7 @@ const copyEventUrl = (slug) => {
               </div>
               <div class="flex items-center gap-2">
                 <Globe class="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span class="font-mono text-[11px] text-slate-300 truncate">bikinacara.reee.my.id/?page={{ ev.slug }}</span>
+                <span class="font-mono text-[11px] text-slate-300 truncate">bikinacara.reee.my.id/{{ ev.slug }}</span>
               </div>
             </div>
 

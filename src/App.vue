@@ -60,21 +60,23 @@ const generatedUrl = computed(() => {
 })
 
 const shareDomainUrl = computed(() => {
-  return `https://bikinacara.reee.my.id/?page=${event.value.slug}`
+  return `https://bikinacara.reee.my.id/${event.value.slug}`
 })
 
 onMounted(async () => {
   // Cek user login
   currentUser.value = AUTH_SERVICE.getCurrentUser()
 
-  // 1. Cek Routing path browser (misal: /dashboard)
-  const path = window.location.pathname.replace(/\/+$/, '')
-  if (path === '/dashboard') {
+  // 1. Cek Routing path browser (misal: /dashboard atau /[slug-acara])
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, '')
+  
+  if (path === 'dashboard') {
     if (currentUser.value) {
       viewMode.value = 'dashboard'
     } else {
       openAuth('login')
     }
+    return
   }
 
   // 2. Cek apakah membuka link publik acara via hash atau query param
@@ -90,8 +92,9 @@ onMounted(async () => {
     }
   }
 
-  const pageSlug = urlParams.get('page')
-  if (pageSlug) {
+  // Cek slug acara: dukung langsung /slug-acara atau fallback ?page=slug-acara
+  const pageSlug = path || urlParams.get('page')
+  if (pageSlug && pageSlug !== 'index.html') {
     // Coba ambil dari Turso dulu jika aktif
     const tursoEvent = await AUTH_SERVICE.getPublicEventBySlug(pageSlug)
     if (tursoEvent) {
@@ -448,7 +451,7 @@ const copyLink = (text) => {
             <div>
               <label class="block font-semibold text-slate-300 mb-1.5">Custom Slug URL Acara (Link)</label>
               <div class="flex items-center rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-slate-400 font-mono text-[11px]">
-                <span class="text-slate-500">bikinacara.reee.my.id/?page=</span>
+                <span class="text-slate-500">bikinacara.reee.my.id/</span>
                 <input 
                   v-model="event.slug" 
                   @input="updateDraft"
