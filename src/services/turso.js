@@ -19,13 +19,31 @@ export const TURSO_CONFIG = {
 
 let dbClient = null
 
+// Helper pembersih URL agar tidak error jika ada spasi, kurung, atau teks ekstra
+function cleanTursoUrl(rawUrl) {
+  if (!rawUrl) return ''
+  let cleaned = String(rawUrl).trim()
+  // Ambil hanya match URL pertama (https://... atau libsql://...)
+  const match = cleaned.match(/(?:https|libsql):\/\/[^\s\(\)]+/)
+  if (match) {
+    cleaned = match[0]
+  }
+  return cleaned.replace('libsql://', 'https://').replace(/\/+$/, '')
+}
+
 export function getDbClient() {
-  if (!TURSO_CONFIG.url || !TURSO_CONFIG.authToken) return null
+  const rawUrl = TURSO_CONFIG.url || localStorage.getItem('eventforge_dev_turso_url') || ''
+  const rawToken = TURSO_CONFIG.authToken || localStorage.getItem('eventforge_dev_turso_token') || ''
+  
+  const url = cleanTursoUrl(rawUrl)
+  const authToken = String(rawToken).trim()
+
+  if (!url || !authToken) return null
   if (!dbClient) {
     try {
       dbClient = createClient({
-        url: TURSO_CONFIG.url.replace('libsql://', 'https://'),
-        authToken: TURSO_CONFIG.authToken
+        url,
+        authToken
       })
     } catch (e) {
       console.error('[Turso] Gagal inisialisasi client:', e)
