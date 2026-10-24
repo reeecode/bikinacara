@@ -282,14 +282,40 @@ export const AUTH_SERVICE = {
           sql: 'SELECT config_json FROM events WHERE user_id = ? ORDER BY updated_at DESC',
           args: [userId]
         })
-        return res.rows.map(r => JSON.parse(r.config_json))
+        const events = res.rows.map(r => JSON.parse(r.config_json))
+        // Selaraskan ke local cache
+        localStorage.setItem('eventforge_user_events_' + userId, JSON.stringify(events))
+        return events
       } catch (e) {
         console.error('[Turso] Fetch events error:', e)
       }
     }
 
-    // Fallback
-    return JSON.parse(localStorage.getItem('eventforge_user_events_' + userId) || '[]')
+    // Fallback Local Storage
+    const local = localStorage.getItem('eventforge_user_events_' + userId)
+    if (local) {
+      return JSON.parse(local)
+    }
+
+    // Jika local cache user ini kosong, cek apakah ada draft event di storage umum
+    const legacy = localStorage.getItem('eventforge_pages')
+    if (legacy) {
+      try {
+        const pages = JSON.parse(legacy)
+        const list = Object.values(pages)
+        if (list.length > 0) {
+          // Asosiasikan dan migrasikan otomatis ke user ini
+          for (const ev of list) {
+            await this.saveUserEvent(userId, ev)
+          }
+          return list
+        }
+      } catch (e) {
+        console.error('Error migrating legacy events:', e)
+      }
+    }
+
+    return []
   },
 
   // 4. SIMPAN / UPDATE EVENT (Dibatasi 1 Event per Akun)

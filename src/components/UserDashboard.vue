@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { 
   Layers, 
   Plus, 
@@ -13,7 +13,8 @@ import {
   Check, 
   Copy,
   LogOut,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-vue-next'
 import { AUTH_SERVICE } from '../services/turso.js'
 
@@ -27,15 +28,28 @@ const props = defineProps({
 const emit = defineEmits(['create-new', 'edit-event', 'logout', 'go-home', 'view-event'])
 
 const userEvents = ref([])
+const isLoading = ref(true)
 const copiedSlug = ref('')
 
 const loadEvents = async () => {
-  userEvents.value = await AUTH_SERVICE.getUserEvents(props.currentUser.id)
+  if (!props.currentUser?.id) return
+  isLoading.value = true
+  try {
+    userEvents.value = await AUTH_SERVICE.getUserEvents(props.currentUser.id)
+  } catch (err) {
+    console.error('Error loading events:', err)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 onMounted(() => {
   loadEvents()
 })
+
+watch(() => props.currentUser, () => {
+  loadEvents()
+}, { deep: true })
 
 const handleDelete = async (slug) => {
   if (confirm(`Yakin ingin menghapus halaman "${slug}"?`)) {
@@ -97,8 +111,14 @@ const copyEventUrl = (slug) => {
         </div>
       </div>
 
+      <!-- Loading State -->
+      <div v-if="isLoading" class="text-center py-16 px-4">
+        <Loader2 class="w-8 h-8 text-emerald-400 animate-spin mx-auto mb-3" />
+        <p class="text-xs text-slate-400 font-medium">Memuat daftar acara dari database...</p>
+      </div>
+
       <!-- Jika Belum Ada Event -->
-      <div v-if="userEvents.length === 0" class="text-center py-16 px-4 rounded-3xl border border-dashed border-slate-800 bg-slate-900/30">
+      <div v-else-if="userEvents.length === 0" class="text-center py-16 px-4 rounded-3xl border border-dashed border-slate-800 bg-slate-900/30">
         <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4">
           <Sparkles class="w-8 h-8" />
         </div>
