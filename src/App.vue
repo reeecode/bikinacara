@@ -22,8 +22,11 @@ import {
   Sliders,
   Palette,
   FileText,
-  MessageSquare
+  MessageSquare,
+  QrCode,
+  Download
 } from 'lucide-vue-next'
+import QRCode from 'qrcode'
 import EventLandingView from './components/EventLandingView.vue'
 import HomePage from './components/HomePage.vue'
 import AuthModal from './components/AuthModal.vue'
@@ -230,6 +233,36 @@ const applyThemePreset = (preset) => {
   event.value.theme.bgColor = preset.bg
   event.value.theme.cardBg = preset.card
   updateDraft()
+}
+
+// State QR Code
+const qrCodeUrl = ref('')
+
+const generateQrCode = async (text) => {
+  try {
+    qrCodeUrl.value = await QRCode.toDataURL(text, {
+      width: 400,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    })
+  } catch (err) {
+    console.error('QR code generation error:', err)
+  }
+}
+
+watch(shareDomainUrl, (newUrl) => {
+  if (newUrl) generateQrCode(newUrl)
+}, { immediate: true })
+
+const downloadQrCode = () => {
+  if (!qrCodeUrl.value) return
+  const a = document.createElement('a')
+  a.href = qrCodeUrl.value
+  a.download = `qrcode-${event.value.slug}.png`
+  a.click()
 }
 
 const copyLink = (text) => {
@@ -909,6 +942,30 @@ const copyLink = (text) => {
                 </button>
               </div>
               <p class="text-[10px] text-slate-500">Tautan ini langsung terhubung ke database dan siap dibuka oleh calon peserta di mana saja.</p>
+            </div>
+
+            <!-- QR CODE GENERATOR CARD -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col items-center text-center space-y-3">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider">
+                <QrCode class="w-4 h-4 text-emerald-400" />
+                <span>QR Code Halaman Acara</span>
+              </div>
+              <p class="text-[11px] text-slate-400 max-w-xs">
+                Cetak atau pasang QR Code ini di pamflet / poster cetak agar peserta bisa langsung scan dari smartphone mereka:
+              </p>
+
+              <!-- QR Code Preview Frame -->
+              <div class="p-3 bg-white rounded-2xl shadow-xl border-4 border-slate-800">
+                <img v-if="qrCodeUrl" :src="qrCodeUrl" alt="QR Code Acara" class="w-40 h-40 object-contain block" />
+              </div>
+
+              <button 
+                @click="downloadQrCode"
+                class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition flex items-center gap-2 cursor-pointer border border-slate-700"
+              >
+                <Download class="w-3.5 h-3.5 text-emerald-400" />
+                <span>Download Gambar QR Code (.PNG)</span>
+              </button>
             </div>
 
             <button 

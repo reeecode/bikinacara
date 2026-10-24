@@ -14,8 +14,12 @@ import {
   Copy,
   LogOut,
   Sparkles,
-  Loader2
+  Loader2,
+  QrCode,
+  Download,
+  X
 } from 'lucide-vue-next'
+import QRCode from 'qrcode'
 import { AUTH_SERVICE } from '../services/turso.js'
 
 const props = defineProps({
@@ -30,6 +34,35 @@ const emit = defineEmits(['create-new', 'edit-event', 'logout', 'go-home', 'view
 const userEvents = ref([])
 const isLoading = ref(true)
 const copiedSlug = ref('')
+
+// State Modal QR Code di Dashboard
+const activeQrModal = ref(null) // null atau objek event { slug, title }
+const dashboardQrUrl = ref('')
+
+const openQrModal = async (ev) => {
+  activeQrModal.value = ev
+  const url = `https://bikinacara.reee.my.id/${ev.slug}`
+  try {
+    dashboardQrUrl.value = await QRCode.toDataURL(url, {
+      width: 400,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    })
+  } catch (err) {
+    console.error('QR code generation error:', err)
+  }
+}
+
+const downloadDashboardQr = () => {
+  if (!dashboardQrUrl.value || !activeQrModal.value) return
+  const a = document.createElement('a')
+  a.href = dashboardQrUrl.value
+  a.download = `qrcode-${activeQrModal.value.slug}.png`
+  a.click()
+}
 
 const loadEvents = async () => {
   if (!props.currentUser?.id) return
@@ -180,6 +213,13 @@ const copyEventUrl = (slug) => {
                   <Copy v-else class="w-3.5 h-3.5" />
                 </button>
                 <button 
+                  @click="openQrModal(ev)"
+                  class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                  title="Lihat / Download QR Code"
+                >
+                  <QrCode class="w-3.5 h-3.5 text-emerald-400" />
+                </button>
+                <button 
                   @click="emit('view-event', ev)"
                   class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
                   title="Buka Halaman Live"
@@ -209,5 +249,44 @@ const copyEventUrl = (slug) => {
         </div>
       </div>
     </main>
+
+    <!-- Modal QR Code di Dashboard -->
+    <div 
+      v-if="activeQrModal" 
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+      @click.self="activeQrModal = null"
+    >
+      <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-[#0c121e] p-6 text-center space-y-4 shadow-2xl relative">
+        <button 
+          @click="activeQrModal = null" 
+          class="absolute top-4 right-4 p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white transition cursor-pointer"
+        >
+          <X class="w-4 h-4" />
+        </button>
+
+        <div class="flex items-center justify-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
+          <QrCode class="w-4 h-4 text-emerald-400" />
+          <span>QR Code Acara</span>
+        </div>
+
+        <h3 class="text-base font-black text-white line-clamp-1">{{ activeQrModal.general?.title || activeQrModal.slug }}</h3>
+        
+        <div class="p-3 bg-white rounded-2xl shadow-xl border-4 border-slate-800 inline-block mx-auto">
+          <img v-if="dashboardQrUrl" :src="dashboardQrUrl" alt="QR Code" class="w-48 h-48 object-contain block" />
+        </div>
+
+        <p class="text-[11px] text-slate-400 leading-relaxed font-mono text-emerald-400 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-800 truncate">
+          https://bikinacara.reee.my.id/{{ activeQrModal.slug }}
+        </p>
+
+        <button 
+          @click="downloadDashboardQr"
+          class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
+        >
+          <Download class="w-4 h-4" />
+          <span>Download Gambar QR Code (.PNG)</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
