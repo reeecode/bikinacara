@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bikinacara.reee.my.id/sitemap.xml
