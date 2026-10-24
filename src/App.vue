@@ -40,6 +40,7 @@ import { AUTH_SERVICE } from './services/turso.js'
 
 // App Navigation state: 'home' | 'dashboard' | 'builder' | 'public_view'
 const viewMode = ref('home')
+const isPublicVisitor = ref(false) // True jika halaman dibuka oleh umum / peserta via link
 const activeTab = ref('general')
 const devicePreview = ref('mobile')
 const mobileBuilderView = ref('editor') // 'editor' | 'preview'
@@ -87,6 +88,7 @@ onMounted(async () => {
     const decoded = decodeEventFromHash(hash)
     if (decoded) {
       event.value = normalizeEventData(decoded)
+      isPublicVisitor.value = true
       viewMode.value = 'public_view'
       return
     }
@@ -99,6 +101,7 @@ onMounted(async () => {
     const tursoEvent = await AUTH_SERVICE.getPublicEventBySlug(pageSlug)
     if (tursoEvent) {
       event.value = normalizeEventData(tursoEvent)
+      isPublicVisitor.value = true
       viewMode.value = 'public_view'
       return
     }
@@ -106,6 +109,7 @@ onMounted(async () => {
     const local = getEventFromLocal(pageSlug)
     if (local) {
       event.value = normalizeEventData(local)
+      isPublicVisitor.value = true
       viewMode.value = 'public_view'
       return
     }
@@ -173,6 +177,7 @@ const editExistingEvent = (ev) => {
 
 const viewLiveEvent = (ev) => {
   event.value = normalizeEventData(ev)
+  isPublicVisitor.value = false
   navigateTo('public_view')
 }
 
@@ -257,7 +262,8 @@ const copyLink = (text) => {
 
   <!-- 3. HALAMAN PUBLIK ACARA LIVE -->
   <div v-else-if="viewMode === 'public_view'" class="min-h-screen bg-[#090d16]">
-    <div class="fixed bottom-4 right-4 z-50 flex items-center gap-2">
+    <!-- Tombol Navigasi Hanya Muncul untuk Pemilik/Panitia saat Preview Sendiri (Bukan Pengunjung Publik) -->
+    <div v-if="!isPublicVisitor" class="fixed bottom-4 right-4 z-50 flex items-center gap-2">
       <button 
         @click="navigateTo(currentUser ? 'dashboard' : 'home')"
         class="px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-slate-300 font-semibold text-xs shadow-2xl backdrop-blur-md hover:bg-slate-800 transition flex items-center gap-1.5 cursor-pointer"
