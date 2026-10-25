@@ -184,6 +184,51 @@ const isSectionVisible = (key) => {
         </ul>
       </div>
 
+      <!-- 4B. CUSTOM CARDS TAMBAHAN (KRITERIA PENILAIAN, JADWAL, DLL) -->
+      <template v-if="event.customCards && event.customCards.length">
+        <div 
+          v-for="(card, cardIdx) in event.customCards" 
+          :key="card.id || cardIdx"
+          class="border border-slate-800/80 rounded-2xl p-6 sm:p-8 backdrop-blur-xl"
+          :style="{ backgroundColor: 'var(--card-bg)' }"
+        >
+          <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <CheckCircle2 class="w-5 h-5" :style="{ color: 'var(--primary)' }" />
+            <span>{{ card.title || 'Informasi Tambahan' }}</span>
+          </h3>
+
+          <!-- Mode List / Poin -->
+          <ul v-if="card.type !== 'text' && card.items && card.items.length" class="space-y-3 text-xs sm:text-sm text-slate-300">
+            <li v-for="(it, i) in card.items" :key="i" class="flex items-start gap-3">
+              <span 
+                class="w-5 h-5 rounded-full border text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5"
+                :style="{ borderColor: 'var(--primary)', color: 'var(--primary)', backgroundColor: 'rgba(16, 185, 129, 0.1)' }"
+              >
+                {{ i + 1 }}
+              </span>
+              <div class="leading-relaxed flex-1">
+                <span>{{ typeof it === 'string' ? it : it.text }}</span>
+                <a 
+                  v-if="it.linkUrl" 
+                  :href="it.linkUrl" 
+                  target="_blank" 
+                  class="inline-flex items-center gap-1 font-semibold ml-1.5 underline hover:opacity-80 transition"
+                  :style="{ color: 'var(--primary)' }"
+                >
+                  {{ it.linkText || 'Buka Tautan' }}
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </div>
+            </li>
+          </ul>
+
+          <!-- Mode Paragraf Bebas -->
+          <p v-else-if="card.content" class="text-slate-300 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
+            {{ card.content }}
+          </p>
+        </div>
+      </template>
+
       <!-- 5. PANEL GABUNG GRUP WHATSAPP PESERTA -->
       <div 
         v-if="isSectionVisible('whatsappGroup') && event.whatsappGroup?.groupUrl" 

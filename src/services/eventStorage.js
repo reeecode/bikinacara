@@ -65,6 +65,7 @@ export const DEFAULT_EVENT = {
       { text: 'Unduh panduan & juknis lengkap lomba di sini:', linkText: 'Download Buku Panduan', linkUrl: 'https://drive.google.com' }
     ]
   },
+  customCards: [],
   registration: {
     title: 'Formulir Pendaftaran',
     subtitle: 'Silakan lengkapi formulir pendaftaran di bawah ini.',
@@ -129,6 +130,17 @@ export function normalizeEventData(raw) {
               )
             : d.requirements.items
         },
+    customCards: Array.isArray(raw.customCards)
+      ? raw.customCards.map(c => ({
+          id: c.id || ('card_' + Math.random().toString(36).substring(2, 7)),
+          title: c.title || 'Informasi Tambahan',
+          type: c.type || 'list', // 'list' (poin-poin) | 'text' (paragraf bebas)
+          content: c.content || '',
+          items: Array.isArray(c.items)
+            ? c.items.map(it => (typeof it === 'string' ? { text: it, linkText: '', linkUrl: '' } : it))
+            : []
+        }))
+      : [],
     registration: {
       ...d.registration,
       ...(raw.registration || {})

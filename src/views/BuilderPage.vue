@@ -78,6 +78,22 @@ const handleFileUpload = async (eventTarget) => {
 
 const currentUser = ref(null)
 const event = ref(normalizeEventData(DEFAULT_EVENT))
+const initialLoadedSlug = ref('')
+const isSaving = ref(false)
+const saveSuccess = ref(false)
+
+const formatSlug = (val) => {
+  return (val || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9_-]/g, '')
+}
+
+const onSlugInput = (e) => {
+  event.value.slug = formatSlug(e.target.value)
+  saveSuccess.value = false
+}
 
 const shareDomainUrl = computed(() => {
   return `https://bikinacara.reee.my.id/${event.value.slug}`
@@ -134,11 +150,13 @@ onMounted(async () => {
     const found = events.find(e => e.slug === editSlug)
     if (found) {
       event.value = normalizeEventData(found)
+      initialLoadedSlug.value = found.slug
       return
     }
     const local = getEventFromLocal(editSlug)
     if (local) {
       event.value = normalizeEventData(local)
+      initialLoadedSlug.value = local.slug
       return
     }
   } else {
@@ -147,22 +165,48 @@ onMounted(async () => {
     if (existingEvents && existingEvents.length >= 1) {
       alert('Setiap akun dibatasi maksimal 1 acara (Free Plan). Mengalihkan ke acara Anda...')
       event.value = normalizeEventData(existingEvents[0])
+      initialLoadedSlug.value = existingEvents[0].slug
       return
     }
     event.value.slug = 'acara-' + Math.random().toString(36).substring(2, 7)
+    initialLoadedSlug.value = ''
   }
 })
 
-// Simpan event ke akun user & Turso
+// Simpan event ke akun user & Turso HANYA saat tombol Simpan ditekan
 const saveCurrentEvent = async () => {
-  if (currentUser.value) {
-    await AUTH_SERVICE.saveUserEvent(currentUser.value.id, event.value)
+  if (!event.value.slug || !event.value.slug.trim()) {
+    alert('Slug link acara tidak boleh kosong!')
+    return
   }
-  saveEventToLocal(event.value)
+  
+  event.value.slug = formatSlug(event.value.slug)
+  isSaving.value = true
+  saveSuccess.value = false
+
+  try {
+    if (currentUser.value) {
+      await AUTH_SERVICE.saveUserEvent(currentUser.value.id, event.value, initialLoadedSlug.value)
+      // Update slug acuan lama ke yang baru setelah berhasil tersimpan
+      initialLoadedSlug.value = event.value.slug
+      // Sinkronkan query URL editor
+      router.replace({ path: '/builder', query: { edit: event.value.slug } })
+    }
+    saveEventToLocal(event.value)
+    saveSuccess.value = true
+    setTimeout(() => {
+      saveSuccess.value = false
+    }, 3000)
+  } catch (err) {
+    alert('Gagal menyimpan perubahan: ' + (err.message || 'Terjadi kesalahan'))
+  } finally {
+    isSaving.value = false
+  }
 }
 
+// updateDraft sekarang HANYA mengubah state reaktif untuk live preview
 const updateDraft = () => {
-  saveCurrentEvent()
+  saveSuccess.value = false
 }
 
 const addHighlight = () => {
@@ -183,6 +227,39 @@ const addRequirement = () => {
 }
 const removeRequirement = (idx) => {
   event.value.requirements.items.splice(idx, 1)
+  updateDraft()
+}
+
+// Custom Cards Tambahan (Kriteria Penilaian, Timeline, dll)
+const addCustomCard = () => {
+  if (!event.value.customCards) {
+    event.value.customCards = []
+  }
+  event.value.customCards.push({
+    id: 'card_' + Math.random().toString(36).substring(2, 7),
+    title: 'Kriteria Penilaian / Informasi Baru',
+    type: 'list',
+    content: '',
+    items: [
+      { text: 'Poin pertama...', linkText: '', linkUrl: '' }
+    ]
+  })
+  updateDraft()
+}
+
+const removeCustomCard = (idx) => {
+  event.value.customCards.splice(idx, 1)
+  updateDraft()
+}
+
+const addCustomCardItem = (card) => {
+  if (!card.items) card.items = []
+  card.items.push({ text: 'Poin baru...', linkText: '', linkUrl: '' })
+  updateDraft()
+}
+
+const removeCustomCardItem = (card, itemIdx) => {
+  card.items.splice(itemIdx, 1)
   updateDraft()
 }
 
@@ -264,12 +341,28 @@ const applyThemePreset = (preset) => {
         </div>
 
         <button 
-          @click="saveCurrentEvent(); activeTab = 'share'"
-          class="px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 cursor-pointer"
+          @click="saveCurrentEvent"
+          :disabled="isSaving"
+          :class="[
+            'px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-lg cursor-pointer disabled:opacity-50',
+            saveSuccess 
+              ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/25 ring-2 ring-emerald-400' 
+              : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+          ]"
         >
-          <Share2 class="w-3.5 h-3.5" />
-          <span class="hidden sm:inline">Bagikan Web Acara</span>
-          <span class="sm:hidden">Share</span>
+          <Loader2 v-if="isSaving" class="w-3.5 h-3.5 animate-spin" />
+          <Check v-else-if="saveSuccess" class="w-3.5 h-3.5" />
+          <Save v-else class="w-3.5 h-3.5" />
+          <span class="hidden sm:inline">{{ isSaving ? 'Menyimpan...' : saveSuccess ? 'Tersimpan ke Database!' : 'Simpan Perubahan' }}</span>
+          <span class="sm:hidden">{{ isSaving ? 'Simpan...' : saveSuccess ? 'Tersimpan' : 'Simpan' }}</span>
+        </button>
+
+        <button 
+          @click="activeTab = 'share'"
+          class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
+        >
+          <Share2 class="w-3.5 h-3.5 text-emerald-400" />
+          <span class="hidden sm:inline">Bagikan</span>
         </button>
       </div>
     </header>
@@ -378,16 +471,17 @@ const applyThemePreset = (preset) => {
             <div v-if="activeTab === 'general'" class="space-y-4">
               <div>
                 <label class="block font-semibold text-slate-300 mb-1.5">Custom Slug URL Acara (Link)</label>
-                <div class="flex items-center rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-slate-400 font-mono text-[11px]">
-                  <span class="text-slate-500">bikinacara.reee.my.id/</span>
+                <div class="flex items-center rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-slate-400 font-mono text-[11px] focus-within:border-emerald-500 transition">
+                  <span class="text-slate-500 select-none">bikinacara.reee.my.id/</span>
                   <input 
-                    v-model="event.slug" 
-                    @input="updateDraft"
+                    :value="event.slug" 
+                    @input="onSlugInput"
                     type="text" 
                     class="bg-transparent border-0 outline-none text-emerald-400 font-bold flex-1 ml-1"
                     placeholder="nama-acara-kamu"
                   />
                 </div>
+                <p class="text-[10px] text-slate-500 mt-1">Gunakan huruf kecil, angka, dan tanda hubung (-). Klik tombol <b>Simpan Perubahan</b> di pojok kanan atas untuk memperbarui URL ini di database.</p>
               </div>
 
               <div>
@@ -679,6 +773,125 @@ const applyThemePreset = (preset) => {
                         placeholder="URL Tujuan (https://...)"
                         class="bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 text-slate-300 outline-none font-mono text-[10px]" 
                       />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CARD / PANEL CUSTOM TAMBAHAN (Kriteria Penilaian, Jadwal, dll) -->
+              <div class="space-y-4 pt-4 border-t border-slate-800/80">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label class="font-bold text-white block">Card / Panel Tambahan Bebas</label>
+                    <span class="text-[10px] text-slate-400">Tambahkan card baru (misal: Kriteria Penilaian, Timeline)</span>
+                  </div>
+                  <button 
+                    @click="addCustomCard" 
+                    type="button"
+                    class="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <Plus class="w-3.5 h-3.5" />
+                    <span>Tambah Card</span>
+                  </button>
+                </div>
+
+                <div v-if="event.customCards && event.customCards.length" class="space-y-4">
+                  <div 
+                    v-for="(card, cardIdx) in event.customCards" 
+                    :key="card.id || cardIdx"
+                    class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3"
+                  >
+                    <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                      <div class="flex-1">
+                        <label class="text-[10px] text-slate-400 block mb-1">Judul Card #{{ cardIdx + 1 }}</label>
+                        <input 
+                          v-model="card.title" 
+                          @input="updateDraft"
+                          type="text" 
+                          class="w-full bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 text-white font-bold outline-none focus:border-emerald-500 text-xs"
+                          placeholder="Contoh: Kriteria Penilaian Juri"
+                        />
+                      </div>
+                      <div class="flex items-center gap-1 mt-4">
+                        <button 
+                          type="button"
+                          @click="card.type = card.type === 'text' ? 'list' : 'text'; updateDraft()"
+                          class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold transition cursor-pointer"
+                          :title="card.type === 'text' ? 'Ganti ke format Poin' : 'Ganti ke format Paragraf Bebas'"
+                        >
+                          {{ card.type === 'text' ? 'Tipe: Paragraf' : 'Tipe: Poin/List' }}
+                        </button>
+                        <button 
+                          type="button"
+                          @click="removeCustomCard(cardIdx)" 
+                          class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition cursor-pointer"
+                          title="Hapus Card Ini"
+                        >
+                          <Trash2 class="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Jika Card Tipe List -->
+                    <div v-if="card.type !== 'text'" class="space-y-2.5">
+                      <div class="flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400">Poin / Butir Informasi:</span>
+                        <button 
+                          type="button"
+                          @click="addCustomCardItem(card)" 
+                          class="text-emerald-400 hover:underline text-[10px] flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <Plus class="w-3 h-3" /> Tambah Poin
+                        </button>
+                      </div>
+
+                      <div v-for="(it, itemIdx) in card.items" :key="itemIdx" class="p-2.5 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5">
+                        <div class="flex items-center gap-2">
+                          <span class="text-emerald-400 font-bold text-[10px]">#{{ itemIdx + 1 }}</span>
+                          <input 
+                            v-model="it.text" 
+                            @input="updateDraft" 
+                            type="text" 
+                            placeholder="Isi poin / keterangan"
+                            class="flex-1 bg-slate-900 px-2 py-1 rounded border border-slate-800 text-white outline-none text-[11px]" 
+                          />
+                          <button 
+                            type="button"
+                            @click="removeCustomCardItem(card, itemIdx)" 
+                            class="text-rose-400 hover:text-rose-300 p-1 cursor-pointer"
+                          >
+                            <Trash2 class="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5 pl-5">
+                          <input 
+                            v-model="it.linkText" 
+                            @input="updateDraft" 
+                            type="text" 
+                            placeholder="Teks Link (Opsional)"
+                            class="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-emerald-400 outline-none text-[10px]" 
+                          />
+                          <input 
+                            v-model="it.linkUrl" 
+                            @input="updateDraft" 
+                            type="url" 
+                            placeholder="URL Tautan (https://...)"
+                            class="bg-slate-900 px-2 py-1 rounded border border-slate-800 text-slate-300 outline-none font-mono text-[10px]" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Jika Card Tipe Paragraf Bebas -->
+                    <div v-else>
+                      <label class="text-[10px] text-slate-400 block mb-1">Isi Paragraf Card</label>
+                      <textarea 
+                        v-model="card.content" 
+                        @input="updateDraft"
+                        rows="3"
+                        class="w-full bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-white text-xs outline-none focus:border-emerald-500 transition resize-none leading-relaxed"
+                        placeholder="Tuliskan teks atau penjelasan lengkap di sini..."
+                      ></textarea>
                     </div>
                   </div>
                 </div>

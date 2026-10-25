@@ -337,15 +337,16 @@ export const AUTH_SERVICE = {
   },
 
   // 4. SIMPAN / UPDATE EVENT (Dibatasi 1 Event per Akun)
-  async saveUserEvent(userId, eventData) {
+  async saveUserEvent(userId, eventData, oldSlug = null) {
     const db = getDbClient()
     const configJson = JSON.stringify(eventData)
 
-    // Cek event yang ada
+    // Cek event yang ada milik user ini
     const currentEvents = await this.getUserEvents(userId)
-    const existing = currentEvents.find(e => e.slug === eventData.slug)
+    const targetOldSlug = oldSlug || eventData.slug
+    const existing = currentEvents.find(e => e.slug === targetOldSlug || e.slug === eventData.slug)
 
-    // Jika membuat event baru tapi sudah punya 1 event lain
+    // Jika membuat event baru (bukan edit) tapi sudah punya 1 event lain
     if (!existing && currentEvents.length >= 1) {
       throw new Error('Batas maksimal tercapai: Anda hanya diperbolehkan membuat 1 acara.')
     }
@@ -353,25 +354,42 @@ export const AUTH_SERVICE = {
     if (db) {
       try {
         await initTursoTables()
-        const eventId = 'ev_' + (eventData.slug || Math.random().toString(36).substring(2, 8))
-        await db.execute({
-          sql: `
-            INSERT INTO events (id, user_id, slug, title, config_json, updated_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(slug) DO UPDATE SET
-              title = excluded.title,
-              config_json = excluded.config_json,
-              updated_at = CURRENT_TIMESTAMP
-          `,
-          args: [eventId, userId, eventData.slug, eventData.general?.title || 'Acara', configJson]
-        })
+
+        // Jika slug berubah pada event yang sudah ada, update record lama atau hapus slug lama
+        if (oldSlug && oldSlug !== eventData.slug) {
+          await db.execute({
+            sql: `
+              UPDATE events 
+              SET slug = ?, title = ?, config_json = ?, updated_at = CURRENT_TIMESTAMP
+              WHERE user_id = ? AND slug = ?
+            `,
+            args: [eventData.slug, eventData.general?.title || 'Acara', configJson, userId, oldSlug]
+          })
+        } else {
+          const eventId = 'ev_' + (eventData.slug || Math.random().toString(36).substring(2, 8))
+          await db.execute({
+            sql: `
+              INSERT INTO events (id, user_id, slug, title, config_json, updated_at)
+              VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+              ON CONFLICT(slug) DO UPDATE SET
+                title = excluded.title,
+                config_json = excluded.config_json,
+                updated_at = CURRENT_TIMESTAMP
+            `,
+            args: [eventId, userId, eventData.slug, eventData.general?.title || 'Acara', configJson]
+          })
+        }
       } catch (e) {
         console.error('[Turso] Save event error:', e)
+        throw e
       }
     }
 
     // Selalu simpan juga di local sebagai instant cache
-    const events = JSON.parse(localStorage.getItem('eventforge_user_events_' + userId) || '[]')
+    let events = JSON.parse(localStorage.getItem('eventforge_user_events_' + userId) || '[]')
+    if (oldSlug && oldSlug !== eventData.slug) {
+      events = events.filter(e => e.slug !== oldSlug)
+    }
     const existingIndex = events.findIndex(e => e.slug === eventData.slug)
     if (existingIndex >= 0) {
       events[existingIndex] = eventData
